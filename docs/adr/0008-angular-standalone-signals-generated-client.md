@@ -32,8 +32,9 @@ Chosen: **option 2**.
 
 ## Implementation notes
 
-- Unit and component tests use **Vitest**, not Jest with `jest-preset-angular`. The Angular CLI now offers Karma or Vitest, and Vitest is its default and supported runner; the Jest integration is no longer first-class. The intent of the decision (fast, jsdom-based unit tests without a browser) is unchanged. Playwright end-to-end tests are not set up yet.
+- Unit and component tests use **Vitest**, not Jest with `jest-preset-angular`. The Angular CLI now offers Karma or Vitest, and Vitest is its default and supported runner; the Jest integration is no longer first-class. The intent of the decision (fast, jsdom-based unit tests without a browser) is unchanged. 
 - The OpenAPI document comes from Swashbuckle and is committed as `dashboard/openapi/splitlab.v1.json`. An API test compares the served document to the committed file and fails when they differ; CI separately regenerates the TypeScript types (`openapi-typescript`, with `openapi-fetch` as the typed client) and fails if they differ. This puts the "fail the build if the committed client is out of date" rule on both steps.
 - The document is made to match what the API really sends: enums as strings, non-nullable properties as required, nullable references as nullable. A test pins the enum case, because it was found drifting during development.
 - The development-only `/dev/token` endpoint is deliberately not in the published document and is called directly.
 - State is signals throughout; RxJS is used for one thing only, the polling results stream.
+- End-to-end tests use Playwright (with axe for the accessibility baseline) against the real API. `tests/Splitlab.E2E.Host` builds the same application as production (`SplitlabApp.Create`) over a SQLite file instead of PostgreSQL, so they run anywhere, including CI, without a database server. This means they do not exercise PostgreSQL-specific code (the `COPY` write path and rollup upserts); those still need a run against a real database.

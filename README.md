@@ -43,7 +43,7 @@ src/Splitlab.Application/    Use cases and repository interfaces
 src/Splitlab.Infrastructure/ EF Core, PostgreSQL, migrations
 src/Splitlab.Api/            HTTP endpoints and composition root
 dashboard/                   Angular dashboard (generated API client; see dashboard/README.md)
-tests/                       SDK, domain and API integration tests
+tests/                       SDK, domain and API integration tests, and the end-to-end test host
 docs/adr/                   Architecture decision records
 .github/workflows/          CI
 ```

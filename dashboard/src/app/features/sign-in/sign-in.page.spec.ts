@@ -56,12 +56,27 @@ describe('SignInPage', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/projects');
   });
 
-  it('needs a name before it will sign in', async () => {
+  it('explains what is missing instead of silently ignoring an empty submit', async () => {
     const fixture = create();
-
     await settle(fixture);
 
-    expect(buttonByText(fixture, 'Sign in')?.disabled).toBe(true);
+    buttonByText(fixture, 'Sign in')?.click();
+    await settle(fixture);
+
+    expect(buttonByText(fixture, 'Sign in')?.disabled).toBe(false); // Enter must always do something
+    expect(el(fixture).querySelector('[role="alert"]')?.textContent).toContain('Enter a name');
+    expect(service.developmentToken).not.toHaveBeenCalled();
+  });
+
+  it('explains what is missing when no token was pasted', async () => {
+    const fixture = create();
+    await settle(fixture);
+
+    buttonByText(fixture, 'Use token')?.click();
+    await settle(fixture);
+
+    expect(el(fixture).querySelector('[role="alert"]')?.textContent).toContain('Paste a token');
+    expect(TestBed.inject(AuthStore).isSignedIn()).toBe(false);
   });
 
   it('says plainly when the server has no development sign-in, and does not sign in', async () => {

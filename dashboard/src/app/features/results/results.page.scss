@@ -54,8 +54,11 @@ section.card,
   }
 }
 
+// Unreliable numbers are marked with a dashed border and a warning, not by fading them: reduced opacity lowers the
+// contrast of every word inside and fails WCAG AA.
 .untrusted {
-  opacity: 0.85;
+  border-style: dashed;
+  border-color: var(--warn);
 }
 
 .sub {

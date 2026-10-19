@@ -50,9 +50,22 @@ npm run test:ci  # once, as CI does
 npm run build
 ```
 
-Unit and component tests run on Vitest with jsdom. End-to-end tests (Playwright) against a running API are not set up yet.
+Unit and component tests run on Vitest with jsdom.
+
+### End-to-end tests
+
+```bash
+npx playwright install chromium        # once, to download a test browser
+npm run e2e                            # starts the API and the dashboard itself, then runs the tests
+PW_CHANNEL=msedge npm run e2e          # or use an installed Edge/Chrome instead of downloading a browser
+```
+
+They drive the real dashboard in a real browser against the real API: its endpoints, authentication, event pipeline, rollups and statistics. Only the database differs from production. `tests/Splitlab.E2E.Host` runs the same application over a throwaway SQLite file, so no database server or Docker is needed. They cover signing in, the experiment lifecycle (checked against what an SDK actually downloads), SDK keys, results computed from events posted the way an SDK would post them, who can see and do what, and accessibility (axe against WCAG A/AA, keyboard-only flows, focus and landmarks).
+
+Each test makes its own data, so they do not depend on each other. After a failure, open the HTML report with `npx playwright show-report`.
 
 ## Not done yet
 
 - Sign-in through a real identity provider (OpenID Connect with PKCE). For now the dashboard takes a token from the Development issuer or a pasted one, and keeps it in `sessionStorage`.
 - Feature flags, project members and an audit log view.
+- Most forms still disable their submit button until valid, which silently swallows Enter. Sign-in already explains what is missing instead; the others should follow.

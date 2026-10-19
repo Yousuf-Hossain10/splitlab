@@ -29,7 +29,7 @@ export function safeReturnUrl(url: string | undefined): string {
             <label for="subject">Your name</label>
             <input id="subject" type="text" autocomplete="username" [ngModel]="subject()" (ngModelChange)="subject.set($event)" name="subject" />
           </div>
-          <button class="btn primary" type="submit" [disabled]="busy() || !subject().trim()">Sign in</button>
+          <button class="btn primary" type="submit" [disabled]="busy()">Sign in</button>
         </form>
       </section>
 
@@ -41,7 +41,7 @@ export function safeReturnUrl(url: string | undefined): string {
             <label for="token">Token</label>
             <textarea id="token" [ngModel]="pasted()" (ngModelChange)="pasted.set($event)" name="token" spellcheck="false" autocomplete="off"></textarea>
           </div>
-          <button class="btn" type="submit" [disabled]="!pasted().trim()">Use token</button>
+          <button class="btn" type="submit">Use token</button>
         </form>
       </section>
     </div>
@@ -71,6 +71,12 @@ export class SignInPage {
   protected readonly error = signal<string | null>(null);
 
   protected async devSignIn(): Promise<void> {
+    // The button is never disabled for an empty field: a disabled submit button silently swallows Enter (for example
+    // right after autofill or voice input), whereas an explanation always helps.
+    if (!this.subject().trim()) {
+      this.error.set('Enter a name to sign in.');
+      return;
+    }
     this.busy.set(true);
     this.error.set(null);
     try {
@@ -84,6 +90,10 @@ export class SignInPage {
   }
 
   protected usePasted(): void {
+    if (!this.pasted().trim()) {
+      this.error.set('Paste a token to continue.');
+      return;
+    }
     this.error.set(null);
     this.auth.signIn(this.pasted());
     void this.router.navigateByUrl(safeReturnUrl(this.returnUrl()));

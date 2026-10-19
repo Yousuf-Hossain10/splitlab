@@ -9,7 +9,8 @@
     "test": "ng test",
     "generate:api": "openapi-typescript openapi/splitlab.v1.json -o src/app/api/schema.d.ts",
     "test:ci": "ng test --watch=false",
-    "check:api": "npm run generate:api && git diff --exit-code -- src/app/api/schema.d.ts"
+    "check:api": "npm run generate:api && git diff --exit-code -- src/app/api/schema.d.ts",
+    "e2e": "playwright test"
   },
   "private": true,
   "packageManager": "npm@11.16.0",
@@ -28,6 +29,8 @@
     "@angular/build": "^22.2.3",
     "@angular/cli": "^22.2.3",
     "@angular/compiler-cli": "^22.2.0",
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1",
     "jsdom": "^30.0.0",
     "openapi-typescript": "^7.13.0",
     "prettier": "^3.8.1",
