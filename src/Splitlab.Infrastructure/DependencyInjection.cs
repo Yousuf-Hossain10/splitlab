@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Splitlab.Application;
 using Splitlab.Application.Events;
+using Splitlab.Application.Results;
 using Splitlab.Infrastructure.Events;
 using Splitlab.Infrastructure.Persistence;
 
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddSingleton(sp => new ChannelEventSink(sp.GetRequiredService<IOptions<EventPipelineOptions>>().Value.Capacity));
         services.AddSingleton<IEventSink>(sp => sp.GetRequiredService<ChannelEventSink>());
         services.AddScoped<IEventStore, EventStore>();
+        services.AddScoped<IExperimentEventReader, ExperimentEventReader>();
         services.AddHostedService<EventWriterService>();
         return services;
     }

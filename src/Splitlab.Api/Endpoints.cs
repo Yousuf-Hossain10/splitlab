@@ -1,6 +1,7 @@
 using Splitlab.Api.Auth;
 using Splitlab.Application;
 using Splitlab.Application.Events;
+using Splitlab.Application.Results;
 using Splitlab.Domain;
 using Splitlab.Domain.Experiments;
 using Splitlab.Domain.Projects;
@@ -188,6 +189,11 @@ internal static class Endpoints
                 await svc.ReplaceVariationsAsync(project, environment, key, body.Version, ToSpecs(body.Variations), ct)))
             .RequireAuthorization(Policies.Editor);
 
+        experiments.MapGet("/{key}/results", async (
+            string project, string environment, string key, string? metric, ResultsService svc, CancellationToken ct) =>
+            Results.Json(new ResultsResponse(await svc.GetAsync(project, environment, key, metric, ct))))
+            .RequireAuthorization(Policies.Viewer);
+
         experiments.MapPost("/{key}/start", async (
             string project, string environment, string key, VersionedRequest body, ExperimentService svc, CancellationToken ct) =>
             ExperimentResponse.From(await svc.StartAsync(project, environment, key, body.Version, ct)))
@@ -287,6 +293,14 @@ internal static class Endpoints
 }
 
 public sealed record DevTokenRequest(string? Subject);
+
+/// <summary>An experiment's results plus the standing caveats that should accompany any reading of them (ADR-0006).</summary>
+public sealed record ResultsResponse(ExperimentResults Results)
+{
+    public string Notice =>
+        "Probabilities are conditional on the sample sizes shown. Bayesian results tolerate repeated looks better than a "
+        + "fixed-horizon test but are not immune to stopping-rule effects, so avoid ending an experiment the moment a number looks good.";
+}
 
 /// <param name="Timestamp">When the event happened. Required: a retry must resend the same timestamp so it is recognised as a duplicate.</param>
 public sealed record IngestEventDto(

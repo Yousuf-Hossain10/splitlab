@@ -29,7 +29,7 @@ flowchart LR
 | Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
 | Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
 | Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised. SDK-side event client still to do |
-| Statistics engine | Planned |
+| Statistics engine | Done, tested: Bayesian results and sample ratio check. Reads raw events for now; rollup tables still to do |
 | Angular dashboard | Planned |
 | Observability, load tests | Planned |
 
@@ -76,6 +76,10 @@ The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/con
 ```
 
 `202` means the valid events were queued (invalid ones are listed by index in `rejected`). `429` with `Retry-After` means back off and retry the same batch. Events are written in batches, so a crash can lose the few seconds still in memory.
+
+### Results ([ADR-0006](docs/adr/0006-bayesian-stats-with-srm-check.md))
+
+`GET /v1/projects/{p}/environments/{e}/experiments/{key}/results?metric=purchase` (any member) returns, per variation, the exposed and converted users, the observed rate, the posterior mean with a 95% credible interval, the probability to beat control and the expected loss. It also reports the sample ratio check and a recommendation: `Leader`, `Inconclusive`, `KeepCollecting`, or `Untrustworthy` when the traffic split does not match the configuration (in which case no winner is shown). Users seen in more than one variation are excluded and counted separately. Output is deterministic for a given dataset.
 
 ### Authentication ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md))
 

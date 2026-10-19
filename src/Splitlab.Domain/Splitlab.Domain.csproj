@@ -4,4 +4,8 @@
     <RootNamespace>Splitlab.Domain</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Splitlab.Domain.Tests" />
+  </ItemGroup>
+
 </Project>

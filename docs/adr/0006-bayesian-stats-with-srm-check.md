@@ -29,3 +29,11 @@ Chosen: **option 3** as the primary analysis, plus a mandatory data-quality chec
 - Positive: results are easier to read, and the SRM check catches the most common cause of bad experiments.
 - Negative: more statistical code to maintain and to test carefully; a frequentist view may be added later as a secondary tab (new ADR).
 - Negative: only binary conversion metrics are covered at first; continuous metrics need a different model.
+
+## Implementation notes
+
+- Expected loss of choosing a variation is `E[max over all variations of the true rate - this variation's true rate]`, in absolute conversion-rate units (0.001 = 0.1 percentage points). The default threshold for calling a leader is 0.001. For two variations this equals `E[max(other - this, 0)]`, which the tests verify against numerical integration.
+- The first variation of an experiment is the control. Probability to beat control, expected loss and probability of being best come from one shared set of Monte Carlo draws (100,000, fixed seed, own generator so results do not change across .NET versions). Credible intervals use exact Beta quantiles.
+- A conversion counts for a user only if it happened at or after that user's first exposure. Conversions are matched to experiments through the user, because conversion events carry no experiment key.
+- No recommendation is made until every variation has at least 100 exposed users.
+- Results are currently computed from raw events on request. ADR-0004's rollup tables remain to be built; the `IExperimentEventReader` seam is where they plug in.

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Splitlab.Api;
 using Splitlab.Api.Auth;
 using Splitlab.Application;
+using Splitlab.Domain.Statistics;
 using Splitlab.Infrastructure;
 using Splitlab.Infrastructure.Events;
 using Splitlab.Infrastructure.Persistence;
@@ -14,6 +15,8 @@ string connectionString = builder.Configuration.GetConnectionString("Splitlab")
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(o => o.UseNpgsql(connectionString));
+builder.Services.AddSingleton(builder.Configuration.GetSection("Stats").Get<AnalysisOptions>() ?? new AnalysisOptions());
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.Configure<EventPipelineOptions>(builder.Configuration.GetSection("EventPipeline"));
 builder.Services.AddSplitlabAuth(builder.Configuration);
 
