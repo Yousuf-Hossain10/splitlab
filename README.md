@@ -25,7 +25,7 @@ flowchart LR
 | Area | State |
 | --- | --- |
 | Decision SDK: hashing and bucketing | Done, tested |
-| Decision SDK: datafile client, polling, decide API | Planned |
+| Decision SDK: datafile client, polling, decide API | Done, tested |
 | Management API, persistence | Planned |
 | Event ingestion pipeline | Planned |
 | Statistics engine | Planned |
@@ -61,6 +61,17 @@ var experiment = new Experiment(
 
 // Same user + same experiment => same answer, on any machine.
 string? variation = Bucketer.Assign("user-42", experiment);
+```
+
+With a running API, `SplitlabClient` polls the datafile (ETag, jitter, exponential backoff) and decides locally; it keeps the last good snapshot on failure and returns your default plus a reason when it has nothing to go on ([ADR-0007](docs/adr/0007-sdk-datafile-polling-with-etag.md)):
+
+```csharp
+using var client = new SplitlabClient(
+    new HttpDatafileSource(new HttpClient(), new Uri("https://splitlab.example/"), "production"));
+client.Start();
+
+Decision d = client.Decide("checkout_flow", "user-42", defaultVariation: "control");
+// d.VariationKey, d.Reason (Assigned, NotInExperiment, ExperimentNotFound, ConfigNotLoaded)
 ```
 
 `Assign` returns `null` when a user falls outside the experiment's allocated traffic. The hash input, bucket space and range layout are specified in [ADR-0003](docs/adr/0003-deterministic-hash-bucketing.md), and golden test vectors in `BucketerTests` let other language SDKs verify they agree.
