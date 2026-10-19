@@ -28,7 +28,7 @@ flowchart LR
 | Decision SDK: datafile client, polling, decide API | Done, tested |
 | Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
 | Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
-| Event ingestion pipeline | Planned |
+| Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised. SDK-side event client still to do |
 | Statistics engine | Planned |
 | Angular dashboard | Planned |
 | Observability, load tests | Planned |
@@ -63,6 +63,19 @@ dotnet run --project src/Splitlab.Api
 ```
 
 The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`.
+
+### Sending events ([ADR-0005](docs/adr/0005-event-ingestion-with-bounded-channel.md))
+
+`POST /v1/events` with an SDK key that has `events:write`. Up to 500 events per request; every event needs an `eventId`, a `userId` and a `timestamp` (a retry must resend the same timestamp so it is recognised as a duplicate):
+
+```json
+{ "events": [
+  { "eventId": "7b1c...", "type": "exposure", "experimentKey": "checkout_flow", "variationKey": "treatment", "userId": "user-42", "timestamp": "2026-10-20T12:00:00Z" },
+  { "eventId": "9d2e...", "type": "conversion", "name": "purchase", "value": 19.99, "userId": "user-42", "timestamp": "2026-10-20T12:00:07Z" }
+] }
+```
+
+`202` means the valid events were queued (invalid ones are listed by index in `rejected`). `429` with `Retry-After` means back off and retry the same batch. Events are written in batches, so a crash can lose the few seconds still in memory.
 
 ### Authentication ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md))
 

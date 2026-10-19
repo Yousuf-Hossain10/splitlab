@@ -21,10 +21,14 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        _connection.Open();
+        if (_connection.State != System.Data.ConnectionState.Open)
+        {
+            _connection.Open();
+        }
 
         builder.UseEnvironment("Testing");
         builder.UseSetting("Auth:Local:SigningKey", SigningKey);
+        builder.UseSetting("EventPipeline:FlushInterval", "00:00:00.050");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<SplitlabDbContext>>();

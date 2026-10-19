@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Splitlab.Application;
 using Splitlab.Domain.Audit;
+using Splitlab.Domain.Events;
 using Splitlab.Domain.Experiments;
 using Splitlab.Domain.Projects;
 
@@ -22,6 +23,8 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
     public DbSet<ProjectMember> Members => Set<ProjectMember>();
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
+    public DbSet<EventRecord> Events => Set<EventRecord>();
 
     // Read by the global query filters on every query. With no tenant set this is Guid.Empty,
     // which matches no row, so forgetting to scope a request fails closed (ADR-0010).
@@ -97,6 +100,25 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.HasIndex(m => new { m.ProjectId, m.Subject }).IsUnique();
             b.HasIndex(m => m.Subject);
             b.HasQueryFilter(m => m.ProjectId == CurrentProjectId);
+        });
+
+        // High-volume and append-only, so no foreign keys. The key includes OccurredAt so the table can be
+        // partitioned by time later (a PostgreSQL unique key must contain the partition column). Written by
+        // EventStore with raw SQL; this mapping serves reads such as rollups.
+        modelBuilder.Entity<EventRecord>(b =>
+        {
+            b.ToTable("events");
+            b.HasKey(e => new { e.EnvironmentId, e.EventId, e.OccurredAt });
+            b.Property(e => e.EventId).HasMaxLength(EventRecord.MaxEventIdLength);
+            b.Property(e => e.UserId).HasMaxLength(EventRecord.MaxUserIdLength);
+            b.Property(e => e.Kind).HasConversion<string>().HasMaxLength(16);
+            b.Property(e => e.ExperimentKey).HasMaxLength(64);
+            b.Property(e => e.VariationKey).HasMaxLength(64);
+            b.Property(e => e.Name).HasMaxLength(64);
+            b.HasIndex(e => new { e.EnvironmentId, e.OccurredAt });
+            b.HasIndex(e => new { e.EnvironmentId, e.ExperimentKey, e.Kind });
+            b.HasIndex(e => e.ProjectId);
+            b.HasQueryFilter(e => e.ProjectId == CurrentProjectId);
         });
 
         modelBuilder.Entity<ApiKey>(b =>

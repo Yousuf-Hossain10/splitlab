@@ -63,6 +63,60 @@ namespace Splitlab.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", (string)null);
                 });
 
+            modelBuilder.Entity("Splitlab.Domain.Events.EventRecord", b =>
+                {
+                    b.Property<Guid>("EnvironmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExperimentKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<double?>("Value")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("VariationKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("EnvironmentId", "EventId", "OccurredAt");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("EnvironmentId", "OccurredAt");
+
+                    b.HasIndex("EnvironmentId", "ExperimentKey", "Kind");
+
+                    b.ToTable("events", (string)null);
+                });
+
             modelBuilder.Entity("Splitlab.Domain.Experiments.Experiment", b =>
                 {
                     b.Property<Guid>("Id")

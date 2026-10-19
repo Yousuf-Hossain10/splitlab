@@ -1,6 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Splitlab.Application;
+using Splitlab.Application.Events;
+using Splitlab.Infrastructure.Events;
 using Splitlab.Infrastructure.Persistence;
 
 namespace Splitlab.Infrastructure;
@@ -21,6 +24,12 @@ public static class DependencyInjection
         services.AddScoped<IExperimentRepository, ExperimentRepository>();
         services.AddScoped<IAuditLog, AuditLog>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        services.AddOptions<EventPipelineOptions>();
+        services.AddSingleton(sp => new ChannelEventSink(sp.GetRequiredService<IOptions<EventPipelineOptions>>().Value.Capacity));
+        services.AddSingleton<IEventSink>(sp => sp.GetRequiredService<ChannelEventSink>());
+        services.AddScoped<IEventStore, EventStore>();
+        services.AddHostedService<EventWriterService>();
         return services;
     }
 }

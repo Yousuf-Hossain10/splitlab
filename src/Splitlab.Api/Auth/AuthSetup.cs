@@ -24,6 +24,7 @@ public static class Policies
     public const string Editor = "Editor";
     public const string Admin = "Admin";
     public const string ConfigRead = "ConfigRead";
+    public const string EventsWrite = "EventsWrite";
 }
 
 /// <summary>Names of the claims the SDK key scheme issues.</summary>
@@ -90,7 +91,11 @@ public static class AuthSetup
             .AddPolicy(Policies.ConfigRead, p => p
                 .AddAuthenticationSchemes(AuthSchemes.SdkKey)
                 .RequireAuthenticatedUser()
-                .RequireClaim(SdkClaims.Permission, SdkClaims.ConfigRead));
+                .RequireClaim(SdkClaims.Permission, SdkClaims.ConfigRead))
+            .AddPolicy(Policies.EventsWrite, p => p
+                .AddAuthenticationSchemes(AuthSchemes.SdkKey)
+                .RequireAuthenticatedUser()
+                .RequireClaim(SdkClaims.Permission, SdkClaims.EventsWrite));
 
         return services;
     }
@@ -112,4 +117,9 @@ public static class AuthSetup
         p.AddAuthenticationSchemes(AuthSchemes.User)
             .RequireAuthenticatedUser()
             .AddRequirements(new ProjectRoleRequirement(minimum));
+}
+
+public static class RateLimitPolicies
+{
+    public const string SdkEvents = "sdk-events";
 }

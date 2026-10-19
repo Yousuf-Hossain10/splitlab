@@ -1,5 +1,6 @@
 using Splitlab.Api.Auth;
 using Splitlab.Application;
+using Splitlab.Application.Events;
 using Splitlab.Domain;
 using Splitlab.Domain.Experiments;
 using Splitlab.Domain.Projects;
@@ -243,6 +244,35 @@ internal static class Endpoints
     }
 
     /// <summary>
+    /// <c>POST /v1/events</c> (ADR-0005): accepts up to 500 events, queues the valid ones and answers 202.
+    /// 429 with <c>Retry-After</c> means the queue is full and the SDK should back off. Needs an SDK key with <c>events:write</c>.
+    /// </summary>
+    public static void MapEventEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapPost("/v1/events", (
+            IngestRequest body, HttpContext http, ITenantContext tenant, EventIngestionService svc) =>
+        {
+            var environmentId = Guid.Parse(http.User.FindFirst(SdkClaims.Environment)!.Value);
+            IReadOnlyList<RawEvent>? events = body.Events?
+                .Select(e => new RawEvent(e.EventId, e.Type, e.ExperimentKey, e.VariationKey, e.Name, e.Value, e.UserId, e.Timestamp))
+                .ToList();
+
+            IngestResult result = svc.Ingest(tenant.ProjectId!.Value, environmentId, events);
+
+            if (result.QueueFull)
+            {
+                http.Response.Headers.RetryAfter = "1";
+                return Results.Problem(
+                    statusCode: StatusCodes.Status429TooManyRequests,
+                    title: "Too many requests",
+                    detail: "The ingestion queue is full. Retry with backoff.");
+            }
+
+            return Results.Json(new { accepted = result.Accepted, rejected = result.Rejected }, statusCode: StatusCodes.Status202Accepted);
+        }).RequireAuthorization(Policies.EventsWrite).RequireRateLimiting(RateLimitPolicies.SdkEvents);
+    }
+
+    /// <summary>
     /// Development convenience: mints a token for the local issuer so the API can be tried without an identity provider.
     /// Only mapped in Development and only when no external authority is configured.
     /// </summary>
@@ -257,3 +287,16 @@ internal static class Endpoints
 }
 
 public sealed record DevTokenRequest(string? Subject);
+
+/// <param name="Timestamp">When the event happened. Required: a retry must resend the same timestamp so it is recognised as a duplicate.</param>
+public sealed record IngestEventDto(
+    string? EventId,
+    string? Type,
+    string? ExperimentKey,
+    string? VariationKey,
+    string? Name,
+    double? Value,
+    string? UserId,
+    DateTimeOffset? Timestamp);
+
+public sealed record IngestRequest(List<IngestEventDto>? Events);

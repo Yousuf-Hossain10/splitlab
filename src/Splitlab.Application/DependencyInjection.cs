@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<DatafileService>();
         services.AddScoped<MemberService>();
         services.AddScoped<ApiKeyService>();
+        services.AddScoped<Events.EventIngestionService>();
         return services;
     }
 }

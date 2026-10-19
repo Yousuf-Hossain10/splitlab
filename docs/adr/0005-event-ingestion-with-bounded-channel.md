@@ -29,3 +29,9 @@ Chosen: **option 2**, with a seam that allows option 3 later.
 - Positive: low and predictable request latency; database writes are efficient; retries are harmless.
 - Negative: events accepted but not yet flushed are lost if the process crashes. The window is bounded by the batch size and flush interval. This is acceptable for analytics counts and is documented to users; a durable outbox or broker is the follow-up if stronger guarantees are needed.
 - Negative: queue state is per-instance, so queue depth must be monitored per instance (ADR-0009).
+
+## Implementation notes
+
+- The deduplication key is `(environment_id, event_id, occurred_at)`, not `(environment_id, event_id)`. PostgreSQL requires a unique key on a partitioned table to contain the partition column, and the table is to be partitioned by `occurred_at` (ADR-0004). SDKs must therefore resend a retried event unchanged, including its timestamp, which is why `timestamp` is required. Timestamps are truncated to milliseconds.
+- The bounded queue accepts a batch whole or not at all (room is reserved up front), so a `429` never leaves a half-accepted batch behind.
+- The events table currently has no partitions and no foreign keys; partitioning and a retention job are follow-up work.
