@@ -17,11 +17,17 @@ public sealed class DatafileService(IProjectRepository projects, IExperimentRepo
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    /// <param name="environmentKey">Environment named in the URL; looked up within the caller's project only.</param>
+    /// <param name="allowedEnvironmentId">The one environment the caller's SDK key is scoped to.</param>
     /// <param name="ifNoneMatch">The ETag the caller already holds, if any.</param>
-    public async Task<DatafileResult> GetAsync(string environmentKey, string? ifNoneMatch, CancellationToken ct)
+    public async Task<DatafileResult> GetAsync(
+        string environmentKey, Guid allowedEnvironmentId, string? ifNoneMatch, CancellationToken ct)
     {
-        ProjectEnvironment environment = await projects.FindEnvironmentByKeyAsync(environmentKey, ct)
-            ?? throw new NotFoundException($"Environment '{environmentKey}' was not found.");
+        ProjectEnvironment? environment = await projects.FindEnvironmentByKeyAsync(environmentKey, ct);
+        if (environment is null || environment.Id != allowedEnvironmentId)
+        {
+            throw new NotFoundException($"Environment '{environmentKey}' was not found.");
+        }
 
         string etag = $"\"{environment.ConfigVersion}\"";
         if (ifNoneMatch == etag)

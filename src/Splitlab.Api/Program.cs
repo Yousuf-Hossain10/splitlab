@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Splitlab.Api;
+using Splitlab.Api.Auth;
 using Splitlab.Application;
 using Splitlab.Infrastructure;
 using Splitlab.Infrastructure.Persistence;
@@ -11,6 +12,7 @@ string connectionString = builder.Configuration.GetConnectionString("Splitlab")
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(o => o.UseNpgsql(connectionString));
+builder.Services.AddSplitlabAuth(builder.Configuration);
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
@@ -24,8 +26,17 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapManagementEndpoints();
 app.MapConfigEndpoints();
+
+string? localKey = app.Configuration["Auth:Local:SigningKey"];
+if (app.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(app.Configuration["Auth:Authority"]) && localKey is not null)
+{
+    app.MapDevTokenEndpoint(localKey);
+}
 
 app.Run();
 

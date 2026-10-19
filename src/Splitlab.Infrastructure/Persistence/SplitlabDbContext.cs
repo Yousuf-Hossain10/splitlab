@@ -1,11 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Splitlab.Application;
 using Splitlab.Domain.Audit;
 using Splitlab.Domain.Experiments;
 using Splitlab.Domain.Projects;
 
 namespace Splitlab.Infrastructure.Persistence;
 
-public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> options) : DbContext(options)
+/// <summary>A write was attempted for a project other than the one the request is scoped to. Always a bug, never user error.</summary>
+public sealed class TenantIsolationException(string message) : InvalidOperationException(message);
+
+public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> options, ITenantContext tenant) : DbContext(options)
 {
     public DbSet<Project> Projects => Set<Project>();
 
@@ -14,6 +18,14 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
     public DbSet<Experiment> Experiments => Set<Experiment>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<ProjectMember> Members => Set<ProjectMember>();
+
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
+    // Read by the global query filters on every query. With no tenant set this is Guid.Empty,
+    // which matches no row, so forgetting to scope a request fails closed (ADR-0010).
+    private Guid CurrentProjectId => tenant.ProjectId ?? Guid.Empty;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -26,6 +38,7 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.Property(p => p.Key).HasMaxLength(64).IsRequired();
             b.Property(p => p.Name).HasMaxLength(200).IsRequired();
             b.HasIndex(p => p.Key).IsUnique();
+            b.HasQueryFilter(p => p.Id == CurrentProjectId);
         });
 
         modelBuilder.Entity<ProjectEnvironment>(b =>
@@ -35,9 +48,9 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.Property(e => e.Key).HasMaxLength(64).IsRequired();
             b.Property(e => e.Name).HasMaxLength(200).IsRequired();
             b.Property(e => e.ConfigVersion).IsConcurrencyToken();
-            b.HasIndex(e => e.Key).IsUnique();
-            b.HasIndex(e => e.ProjectId);
+            b.HasIndex(e => new { e.ProjectId, e.Key }).IsUnique();
             b.HasOne<Project>().WithMany().HasForeignKey(e => e.ProjectId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => e.ProjectId == CurrentProjectId);
         });
 
         modelBuilder.Entity<Experiment>(b =>
@@ -51,6 +64,7 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.HasIndex(e => new { e.EnvironmentId, e.Key }).IsUnique();
             b.HasIndex(e => e.ProjectId);
             b.HasOne<ProjectEnvironment>().WithMany().HasForeignKey(e => e.EnvironmentId).OnDelete(DeleteBehavior.Restrict);
+            b.HasQueryFilter(e => e.ProjectId == CurrentProjectId);
 
             b.Ignore(e => e.Variations);
             b.OwnsMany<Variation>("_variations", v =>
@@ -71,6 +85,67 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.Property(a => a.EntityType).HasMaxLength(100).IsRequired();
             b.Property(a => a.Detail).HasMaxLength(1000);
             b.HasIndex(a => new { a.ProjectId, a.At });
+            b.HasQueryFilter(a => a.ProjectId == CurrentProjectId);
         });
+
+        modelBuilder.Entity<ProjectMember>(b =>
+        {
+            b.ToTable("project_members");
+            b.HasKey(m => m.Id);
+            b.Property(m => m.Subject).HasMaxLength(200).IsRequired();
+            b.Property(m => m.Role).HasConversion<string>().HasMaxLength(16);
+            b.HasIndex(m => new { m.ProjectId, m.Subject }).IsUnique();
+            b.HasIndex(m => m.Subject);
+            b.HasQueryFilter(m => m.ProjectId == CurrentProjectId);
+        });
+
+        modelBuilder.Entity<ApiKey>(b =>
+        {
+            b.ToTable("api_keys");
+            b.HasKey(k => k.Id);
+            b.Property(k => k.Name).HasMaxLength(200).IsRequired();
+            b.Property(k => k.Prefix).HasMaxLength(16).IsRequired();
+            b.Property(k => k.KeyHash).HasMaxLength(64).IsRequired();
+            b.HasIndex(k => k.Prefix).IsUnique();
+            b.HasIndex(k => k.EnvironmentId);
+            b.HasQueryFilter(k => k.ProjectId == CurrentProjectId);
+        });
+    }
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnforceTenantOnWrites();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        EnforceTenantOnWrites();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    /// <summary>Defence in depth: even if a use case builds the wrong entity, it cannot be written into another tenant.</summary>
+    private void EnforceTenantOnWrites()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified or EntityState.Deleted))
+            {
+                continue;
+            }
+
+            Guid? owner = entry.Entity switch
+            {
+                Project p => p.Id,
+                ITenantOwned t => t.ProjectId,
+                _ => null,
+            };
+
+            if (owner is not null && owner != tenant.ProjectId)
+            {
+                throw new TenantIsolationException(
+                    $"Refusing to write {entry.Metadata.ClrType.Name} for project {owner}: the request is scoped to {tenant.ProjectId?.ToString() ?? "no project"}.");
+            }
+        }
     }
 }

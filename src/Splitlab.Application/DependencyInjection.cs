@@ -10,6 +10,8 @@ public static class DependencyInjection
         services.AddScoped<ProjectService>();
         services.AddScoped<ExperimentService>();
         services.AddScoped<DatafileService>();
+        services.AddScoped<MemberService>();
+        services.AddScoped<ApiKeyService>();
         return services;
     }
 }

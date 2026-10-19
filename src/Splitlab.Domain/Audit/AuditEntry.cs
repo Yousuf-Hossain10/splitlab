@@ -1,7 +1,9 @@
+using Splitlab.Domain.Projects;
+
 namespace Splitlab.Domain.Audit;
 
 /// <summary>Who changed what and when. Written in the same transaction as the change (ADR-0004).</summary>
-public sealed class AuditEntry
+public sealed class AuditEntry : ITenantOwned
 {
     private AuditEntry()
     {

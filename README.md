@@ -26,7 +26,8 @@ flowchart LR
 | --- | --- |
 | Decision SDK: hashing and bucketing | Done, tested |
 | Decision SDK: datafile client, polling, decide API | Done, tested |
-| Management API, persistence | In progress: projects, environments, experiments, audit log, datafile endpoint. Auth and flags still to do |
+| Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
+| Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
 | Event ingestion pipeline | Planned |
 | Statistics engine | Planned |
 | Angular dashboard | Planned |
@@ -61,7 +62,19 @@ docker compose up -d
 dotnet run --project src/Splitlab.Api
 ```
 
-The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`. It has no authentication yet ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md) is not implemented), so do not expose it.
+The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`.
+
+### Authentication ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md))
+
+- **People** send a JWT bearer token. In production set `Auth:Authority` and `Auth:Audience` to your OpenID Connect provider. In Development a local issuer is enabled, so you can get a token without an identity provider:
+
+  ```bash
+  curl -s -X POST localhost:5000/dev/token -H "Content-Type: application/json" -d '{"subject":"alice"}'
+  ```
+
+- Whoever creates a project becomes its Admin and can add members as `Viewer`, `Editor` or `Admin` (`PUT /v1/projects/{p}/members/{subject}`). Callers outside a project get 403, the same as for a project that does not exist.
+- **SDKs** use environment-scoped keys (`POST /v1/projects/{p}/environments/{e}/api-keys`). The secret is returned once; only a SHA-256 hash and a short prefix are stored. Keys can be revoked or rotated.
+- Every tenant-owned table carries `project_id`. EF Core query filters scope reads, and a write guard rejects saving into another project. With no tenant set, queries return nothing.
 
 ## Bucketing in one example
 
@@ -80,7 +93,7 @@ With a running API, `SplitlabClient` polls the datafile (ETag, jitter, exponenti
 
 ```csharp
 using var client = new SplitlabClient(
-    new HttpDatafileSource(new HttpClient(), new Uri("https://splitlab.example/"), "production"));
+    new HttpDatafileSource(new HttpClient(), new Uri("https://splitlab.example/"), "production", sdkKey: "sl_..."));
 client.Start();
 
 Decision d = client.Decide("checkout_flow", "user-42", defaultVariation: "control");

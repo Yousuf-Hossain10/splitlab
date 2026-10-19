@@ -4,25 +4,38 @@ namespace Splitlab.Application;
 
 public sealed class ProjectService(
     IProjectRepository projects,
+    IAccessRepository access,
+    IMemberRepository members,
+    ICurrentUser user,
+    ITenantContext tenant,
     IAuditLog audit,
     IUnitOfWork unitOfWork,
     TimeProvider clock)
 {
+    /// <summary>Creates a project; the caller becomes its first Admin.</summary>
     public async Task<Project> CreateProjectAsync(string? key, string? name, CancellationToken ct)
     {
-        var project = Project.Create(key, name, clock.GetUtcNow());
-        if (await projects.FindProjectAsync(project.Key, ct) is not null)
+        string subject = user.Subject ?? throw new UnauthorizedAccessException("A signed-in user is required.");
+        DateTimeOffset now = clock.GetUtcNow();
+        var project = Project.Create(key, name, now);
+
+        if (await access.ProjectKeyExistsAsync(project.Key, ct))
         {
             throw new ConflictException($"Project '{project.Key}' already exists.");
         }
 
+        // The new project is the only tenant this request may write to.
+        tenant.Use(project.Id);
         projects.Add(project);
+        members.Add(ProjectMember.Create(project.Id, subject, ProjectRole.Admin, now));
         audit.Record(project.Id, "project.created", nameof(Project), project.Id, project.Key);
         await unitOfWork.CommitAsync(ct);
         return project;
     }
 
-    public Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken ct) => projects.ListProjectsAsync(ct);
+    /// <summary>Lists the projects the caller is a member of.</summary>
+    public Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken ct) =>
+        access.ListProjectsForAsync(user.Subject ?? throw new UnauthorizedAccessException("A signed-in user is required."), ct);
 
     public async Task<Project> GetProjectAsync(string key, CancellationToken ct) =>
         await projects.FindProjectAsync(key, ct) ?? throw new NotFoundException($"Project '{key}' was not found.");
@@ -33,9 +46,9 @@ public sealed class ProjectService(
         Project project = await GetProjectAsync(projectKey, ct);
         var environment = ProjectEnvironment.Create(project.Id, key, name, clock.GetUtcNow());
 
-        if (await projects.FindEnvironmentByKeyAsync(environment.Key, ct) is not null)
+        if (await projects.FindEnvironmentAsync(project.Id, environment.Key, ct) is not null)
         {
-            throw new ConflictException($"Environment key '{environment.Key}' is already in use.");
+            throw new ConflictException($"Environment '{environment.Key}' already exists in this project.");
         }
 
         projects.Add(environment);

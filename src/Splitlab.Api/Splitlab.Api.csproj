@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Splitlab.Application\Splitlab.Application.csproj" />
     <ProjectReference Include="..\Splitlab.Infrastructure\Splitlab.Infrastructure.csproj" />
     <InternalsVisibleTo Include="Splitlab.Api.Tests" />

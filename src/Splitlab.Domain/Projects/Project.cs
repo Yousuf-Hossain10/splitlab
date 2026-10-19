@@ -25,7 +25,7 @@ public sealed class Project
 }
 
 /// <summary>A deployment target of a project, such as production. Owns the version of its published datafile.</summary>
-public sealed class ProjectEnvironment
+public sealed class ProjectEnvironment : ITenantOwned
 {
     private ProjectEnvironment()
     {

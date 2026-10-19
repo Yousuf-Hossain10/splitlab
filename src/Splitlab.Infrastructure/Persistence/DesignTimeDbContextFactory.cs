@@ -7,7 +7,9 @@ namespace Splitlab.Infrastructure.Persistence;
 internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SplitlabDbContext>
 {
     public SplitlabDbContext CreateDbContext(string[] args) =>
-        new(new DbContextOptionsBuilder<SplitlabDbContext>()
-            .UseNpgsql("Host=localhost;Database=splitlab_design_time")
-            .Options);
+        new(
+            new DbContextOptionsBuilder<SplitlabDbContext>()
+                .UseNpgsql("Host=localhost;Database=splitlab_design_time")
+                .Options,
+            new TenantContext());
 }

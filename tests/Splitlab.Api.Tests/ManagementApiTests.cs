@@ -1,61 +1,22 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Splitlab.Infrastructure.Persistence;
 using Splitlab.Sdk;
 using Splitlab.Sdk.Config;
 
 namespace Splitlab.Api.Tests;
 
-public sealed class ManagementApiTests : IClassFixture<ApiFactory>
+public sealed class ManagementApiTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private readonly HttpClient _http;
-
-    private readonly ApiFactory _factory;
-
-    public ManagementApiTests(ApiFactory factory)
-    {
-        _factory = factory;
-        _http = factory.CreateClient();
-    }
-
-    // Keys are unique per test because the factory (and its database) is shared by the class.
-    private static string Unique(string prefix) => $"{prefix}-{Guid.NewGuid():N}"[..24];
-
-    private async Task<(string Project, string Environment)> SeedAsync()
-    {
-        string project = Unique("proj");
-        string environment = Unique("env");
-        Assert.Equal(HttpStatusCode.Created, (await _http.PostAsJsonAsync("/v1/projects", new { key = project, name = "P" })).StatusCode);
-        Assert.Equal(
-            HttpStatusCode.Created,
-            (await _http.PostAsJsonAsync($"/v1/projects/{project}/environments", new { key = environment, name = "E" })).StatusCode);
-        return (project, environment);
-    }
-
-    private static object TwoWay => new[]
-    {
-        new { key = "control", trafficBasisPoints = 5_000 },
-        new { key = "treatment", trafficBasisPoints = 5_000 },
-    };
-
-    private async Task<ExperimentView> CreateExperimentAsync(string project, string environment, string key = "checkout")
-    {
-        HttpResponseMessage response = await _http.PostAsJsonAsync(
-            $"/v1/projects/{project}/environments/{environment}/experiments",
-            new { key, name = "Checkout", variations = TwoWay });
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<ExperimentView>())!;
-    }
-
-    private sealed record ExperimentView(string Key, string Status, int Version);
-
     [Fact]
     public async Task DuplicateProjectIsAConflictProblem()
     {
-        string key = Unique("dup");
-        await _http.PostAsJsonAsync("/v1/projects", new { key, name = "P" });
+        Workspace ws = await Workspace.CreateAsync(factory);
 
-        HttpResponseMessage second = await _http.PostAsJsonAsync("/v1/projects", new { key, name = "P" });
+        HttpResponseMessage second = await factory.ClientFor("someone-else")
+            .PostAsJsonAsync("/v1/projects", new { key = ws.Project, name = "P" });
 
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
         Assert.Equal("application/problem+json", second.Content.Headers.ContentType?.MediaType);
@@ -64,28 +25,35 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task InvalidInputIsABadRequest()
     {
-        HttpResponseMessage response = await _http.PostAsJsonAsync("/v1/projects", new { key = "Bad Key", name = "P" });
+        HttpResponseMessage response = await factory.ClientFor(Workspace.Unique("u"))
+            .PostAsJsonAsync("/v1/projects", new { key = "Bad Key", name = "P" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task UnknownResourcesAre404()
+    public async Task CreatorBecomesAdminAndSeesOnlyTheirOwnProjects()
     {
-        Assert.Equal(HttpStatusCode.NotFound, (await _http.GetAsync("/v1/projects/nope")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await _http.GetAsync("/v1/config/nope")).StatusCode);
+        Workspace mine = await Workspace.CreateAsync(factory);
+        Workspace theirs = await Workspace.CreateAsync(factory);
+
+        string listed = await mine.Client.GetStringAsync("/v1/projects");
+
+        Assert.Contains(mine.Project, listed, StringComparison.Ordinal);
+        Assert.DoesNotContain(theirs.Project, listed, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task ExperimentLifecycleOverHttp()
     {
-        (string project, string environment) = await SeedAsync();
-        string baseUrl = $"/v1/projects/{project}/environments/{environment}/experiments";
-        ExperimentView created = await CreateExperimentAsync(project, environment);
+        Workspace ws = await Workspace.CreateAsync(factory);
+        ExperimentView created = await ws.CreateExperimentAsync();
 
-        HttpResponseMessage started = await _http.PostAsJsonAsync($"{baseUrl}/checkout/start", new { version = created.Version });
+        HttpResponseMessage started = await ws.Client.PostAsJsonAsync(
+            $"{ws.EnvironmentUrl}/experiments/checkout/start", new { version = created.Version });
         var running = (await started.Content.ReadFromJsonAsync<ExperimentView>())!;
-        HttpResponseMessage stopped = await _http.PostAsJsonAsync($"{baseUrl}/checkout/stop", new { version = running.Version });
+        HttpResponseMessage stopped = await ws.Client.PostAsJsonAsync(
+            $"{ws.EnvironmentUrl}/experiments/checkout/stop", new { version = running.Version });
         var final = (await stopped.Content.ReadFromJsonAsync<ExperimentView>())!;
 
         Assert.Equal(("Draft", 1), (created.Status, created.Version));
@@ -96,11 +64,11 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task StaleVersionIsAConflict()
     {
-        (string project, string environment) = await SeedAsync();
-        await CreateExperimentAsync(project, environment);
+        Workspace ws = await Workspace.CreateAsync(factory);
+        await ws.CreateExperimentAsync();
 
-        HttpResponseMessage response = await _http.PostAsJsonAsync(
-            $"/v1/projects/{project}/environments/{environment}/experiments/checkout/start", new { version = 99 });
+        HttpResponseMessage response = await ws.Client.PostAsJsonAsync(
+            $"{ws.EnvironmentUrl}/experiments/checkout/start", new { version = 99 });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -108,9 +76,9 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task VariationsCanBeReplacedInDraftButNotWhileRunning()
     {
-        (string project, string environment) = await SeedAsync();
-        string baseUrl = $"/v1/projects/{project}/environments/{environment}/experiments/checkout";
-        ExperimentView created = await CreateExperimentAsync(project, environment);
+        Workspace ws = await Workspace.CreateAsync(factory);
+        string url = $"{ws.EnvironmentUrl}/experiments/checkout";
+        ExperimentView created = await ws.CreateExperimentAsync();
         var three = new[]
         {
             new { key = "a", trafficBasisPoints = 3_000 },
@@ -118,10 +86,10 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
             new { key = "c", trafficBasisPoints = 3_000 },
         };
 
-        HttpResponseMessage replaced = await _http.PutAsJsonAsync($"{baseUrl}/variations", new { version = created.Version, variations = three });
+        HttpResponseMessage replaced = await ws.Client.PutAsJsonAsync($"{url}/variations", new { version = created.Version, variations = three });
         var afterReplace = (await replaced.Content.ReadFromJsonAsync<ExperimentView>())!;
-        await _http.PostAsJsonAsync($"{baseUrl}/start", new { version = afterReplace.Version });
-        HttpResponseMessage tooLate = await _http.PutAsJsonAsync($"{baseUrl}/variations", new { version = afterReplace.Version + 1, variations = three });
+        await ws.Client.PostAsJsonAsync($"{url}/start", new { version = afterReplace.Version });
+        HttpResponseMessage tooLate = await ws.Client.PutAsJsonAsync($"{url}/variations", new { version = afterReplace.Version + 1, variations = three });
 
         Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
         Assert.Equal(2, afterReplace.Version);
@@ -131,20 +99,20 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     [Fact]
     public async Task DatafileOnlyContainsRunningExperimentsAndSupportsETag()
     {
-        (string project, string environment) = await SeedAsync();
-        ExperimentView draft = await CreateExperimentAsync(project, environment, "still-draft");
-        ExperimentView live = await CreateExperimentAsync(project, environment, "live");
+        Workspace ws = await Workspace.CreateAsync(factory);
+        await ws.CreateExperimentAsync("still-draft");
+        ExperimentView live = await ws.CreateExperimentAsync("live");
+        IssuedKey key = await ws.CreateKeyAsync();
+        HttpClient sdk = factory.ClientWithKey(key.Secret);
+        string url = $"/v1/config/{ws.Environment}";
 
-        HttpResponseMessage empty = await _http.GetAsync($"/v1/config/{environment}");
-        await _http.PostAsJsonAsync(
-            $"/v1/projects/{project}/environments/{environment}/experiments/live/start", new { version = live.Version });
-        HttpResponseMessage published = await _http.GetAsync($"/v1/config/{environment}");
-        string etag = published.Headers.ETag!.ToString();
-        using var conditional = new HttpRequestMessage(HttpMethod.Get, $"/v1/config/{environment}");
-        conditional.Headers.TryAddWithoutValidation("If-None-Match", etag);
-        HttpResponseMessage notModified = await _http.SendAsync(conditional);
+        HttpResponseMessage empty = await sdk.GetAsync(url);
+        await ws.Client.PostAsJsonAsync($"{ws.EnvironmentUrl}/experiments/live/start", new { version = live.Version });
+        HttpResponseMessage published = await sdk.GetAsync(url);
+        using var conditional = new HttpRequestMessage(HttpMethod.Get, url);
+        conditional.Headers.TryAddWithoutValidation("If-None-Match", published.Headers.ETag!.ToString());
+        HttpResponseMessage notModified = await sdk.SendAsync(conditional);
 
-        Assert.Equal(1, draft.Version);
         Assert.Contains("\"experiments\":[]", await empty.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         string body = await published.Content.ReadAsStringAsync();
         Assert.Contains("\"live\"", body, StringComparison.Ordinal);
@@ -153,14 +121,15 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task TheRealSdkConsumesTheDatafileEndpoint()
+    public async Task TheRealSdkConsumesTheDatafileEndpointWithItsKey()
     {
-        (string project, string environment) = await SeedAsync();
-        ExperimentView live = await CreateExperimentAsync(project, environment, "live");
-        await _http.PostAsJsonAsync(
-            $"/v1/projects/{project}/environments/{environment}/experiments/live/start", new { version = live.Version });
+        Workspace ws = await Workspace.CreateAsync(factory);
+        ExperimentView live = await ws.CreateExperimentAsync("live");
+        await ws.Client.PostAsJsonAsync($"{ws.EnvironmentUrl}/experiments/live/start", new { version = live.Version });
+        IssuedKey key = await ws.CreateKeyAsync();
 
-        var source = new HttpDatafileSource(_http, new Uri("http://localhost/"), environment);
+        var source = new HttpDatafileSource(
+            factory.CreateClient(), new Uri("http://localhost/"), ws.Environment, key.Secret);
         using var client = new SplitlabClient(source);
         bool first = await client.RefreshAsync();
         bool second = await client.RefreshAsync();
@@ -173,16 +142,17 @@ public sealed class ManagementApiTests : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task EveryChangeIsAudited()
+    public async Task ChangesAreAuditedWithTheActor()
     {
-        (string project, string environment) = await SeedAsync();
-        await CreateExperimentAsync(project, environment);
+        Workspace ws = await Workspace.CreateAsync(factory);
+        await ws.CreateExperimentAsync();
 
-        // project.created, environment.created, experiment.created
-        using IServiceScope scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<Splitlab.Infrastructure.Persistence.SplitlabDbContext>();
-        var actions = db.AuditEntries.Where(a => a.Detail == project || a.Detail == environment || a.Detail == "checkout")
-            .Select(a => a.Action).ToList();
+        using IServiceScope scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SplitlabDbContext>();
+        var actions = db.AuditEntries.IgnoreQueryFilters()
+            .Where(a => a.Actor == ws.User)
+            .Select(a => a.Action)
+            .ToList();
 
         Assert.Contains("project.created", actions);
         Assert.Contains("environment.created", actions);

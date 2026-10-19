@@ -24,8 +24,6 @@ public interface IProjectRepository
 {
     Task<Project?> FindProjectAsync(string key, CancellationToken ct);
 
-    Task<IReadOnlyList<Project>> ListProjectsAsync(CancellationToken ct);
-
     Task<ProjectEnvironment?> FindEnvironmentAsync(Guid projectId, string key, CancellationToken ct);
 
     /// <summary>Finds an environment by its globally unique key, as used by the SDK datafile endpoint.</summary>

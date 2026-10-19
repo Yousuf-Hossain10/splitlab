@@ -1,3 +1,5 @@
+using Splitlab.Domain.Projects;
+
 namespace Splitlab.Domain.Experiments;
 
 public enum ExperimentStatus
@@ -37,7 +39,7 @@ public sealed class Variation
 /// An A/B experiment in one environment. Variations can only change while it is a draft,
 /// so a published datafile never changes under running traffic.
 /// </summary>
-public sealed class Experiment
+public sealed class Experiment : ITenantOwned
 {
     /// <summary>Size of the bucket space; must match the SDK's <c>Bucketer.BucketSpace</c> (ADR-0003).</summary>
     public const int BucketSpace = 10_000;
