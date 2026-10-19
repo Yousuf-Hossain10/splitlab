@@ -26,7 +26,7 @@ flowchart LR
 | --- | --- |
 | Decision SDK: hashing and bucketing | Done, tested |
 | Decision SDK: datafile client, polling, decide API | Done, tested |
-| Management API, persistence | Planned |
+| Management API, persistence | In progress: projects, environments, experiments, audit log, datafile endpoint. Auth and flags still to do |
 | Event ingestion pipeline | Planned |
 | Statistics engine | Planned |
 | Angular dashboard | Planned |
@@ -35,8 +35,12 @@ flowchart LR
 ## Repository layout
 
 ```
-src/Splitlab.Sdk/           Decision SDK (no server dependencies)
-tests/Splitlab.Sdk.Tests/   SDK unit tests
+src/Splitlab.Sdk/            Decision SDK (no server dependencies)
+src/Splitlab.Domain/         Entities and business rules (no dependencies)
+src/Splitlab.Application/    Use cases and repository interfaces
+src/Splitlab.Infrastructure/ EF Core, PostgreSQL, migrations
+src/Splitlab.Api/            HTTP endpoints and composition root
+tests/                       SDK, domain and API integration tests
 docs/adr/                   Architecture decision records
 .github/workflows/          CI
 ```
@@ -49,6 +53,15 @@ Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 dotnet build
 dotnet test
 ```
+
+To run the API locally (migrations apply automatically in Development):
+
+```bash
+docker compose up -d
+dotnet run --project src/Splitlab.Api
+```
+
+The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`. It has no authentication yet ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md) is not implemented), so do not expose it.
 
 ## Bucketing in one example
 

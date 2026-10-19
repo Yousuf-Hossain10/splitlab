@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <RootNamespace>Splitlab.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Splitlab.Application\Splitlab.Application.csproj" />
+    <ProjectReference Include="..\Splitlab.Infrastructure\Splitlab.Infrastructure.csproj" />
+    <InternalsVisibleTo Include="Splitlab.Api.Tests" />
+  </ItemGroup>
+
+</Project>
