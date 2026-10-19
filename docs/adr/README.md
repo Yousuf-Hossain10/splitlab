@@ -7,3 +7,5 @@ Each file records one significant decision using a MADR-style structure: context
 | [0001](0001-record-architecture-decisions.md) | Record architecture decisions | Accepted |
 | [0002](0002-modular-monolith-and-clean-architecture.md) | Modular monolith with clean architecture; SDK as a separate package | Accepted |
 | [0003](0003-deterministic-hash-bucketing.md) | Deterministic hash bucketing instead of stored assignments | Accepted |
+| [0004](0004-postgresql-and-ef-core.md) | PostgreSQL with EF Core for configuration and events | Accepted |
+| [0005](0005-event-ingestion-with-bounded-channel.md) | Event ingestion through a bounded in-process queue with batched writes | Accepted |
