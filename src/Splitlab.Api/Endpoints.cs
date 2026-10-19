@@ -135,6 +135,7 @@ internal static class Endpoints
         MapMembers(project);
         MapExperiments(project);
         MapApiKeys(project);
+        MapRollups(project);
     }
 
     private static void MapMembers(RouteGroupBuilder project)
@@ -203,6 +204,15 @@ internal static class Endpoints
             string project, string environment, string key, VersionedRequest body, ExperimentService svc, CancellationToken ct) =>
             ExperimentResponse.From(await svc.StopAsync(project, environment, key, body.Version, ct)))
             .RequireAuthorization(Policies.Editor);
+    }
+
+    private static void MapRollups(RouteGroupBuilder project)
+    {
+        // Rollups are maintained automatically as events are stored; this backfills or repairs them from the raw events.
+        project.MapPost("/environments/{environment}/rollups/rebuild", async (
+            string project, string environment, RollupService svc, CancellationToken ct) =>
+            Results.Ok(await svc.RebuildAsync(project, environment, ct)))
+            .RequireAuthorization(Policies.Admin);
     }
 
     private static void MapApiKeys(RouteGroupBuilder project)

@@ -30,7 +30,8 @@ public static class DependencyInjection
         services.AddSingleton(sp => new ChannelEventSink(sp.GetRequiredService<IOptions<EventPipelineOptions>>().Value.Capacity));
         services.AddSingleton<IEventSink>(sp => sp.GetRequiredService<ChannelEventSink>());
         services.AddScoped<IEventStore, EventStore>();
-        services.AddScoped<IExperimentEventReader, ExperimentEventReader>();
+        services.AddScoped<IExperimentCountsReader, ExperimentCountsReader>();
+        services.AddScoped<IRollupRebuilder, RollupRebuilder>();
         services.AddHostedService<EventWriterService>();
         return services;
     }

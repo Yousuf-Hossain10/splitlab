@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<ApiKeyService>();
         services.AddScoped<Events.EventIngestionService>();
         services.AddScoped<Results.ResultsService>();
+        services.AddScoped<Results.RollupService>();
         services.AddSingleton(new Splitlab.Domain.Statistics.AnalysisOptions());
         return services;
     }

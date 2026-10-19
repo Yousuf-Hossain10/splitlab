@@ -5,19 +5,19 @@ using Splitlab.Domain.Statistics;
 
 namespace Splitlab.Application.Results;
 
-public readonly record struct ExposureRow(string UserId, string VariationKey, DateTimeOffset At);
+/// <summary>Unique users who were exposed to a variation, and how many of them converted.</summary>
+public sealed record VariationCount(string VariationKey, long Exposed, long Converted);
 
-public readonly record struct ConversionRow(string UserId, DateTimeOffset At);
+/// <param name="ByVariation">Counts for users in exactly one variation. May include keys the experiment does not define.</param>
+/// <param name="ExcludedUsers">Users exposed to more than one variation.</param>
+public sealed record ExperimentCounts(IReadOnlyList<VariationCount> ByVariation, long ExcludedUsers);
 
 /// <summary>
-/// Streams the raw events an analysis needs. Rows are streamed so a large experiment is not loaded as one list.
-/// Implementations are scoped to the current tenant.
+/// Reads an experiment's user counts from the rollup tables (ADR-0004). Implementations are scoped to the current tenant.
 /// </summary>
-public interface IExperimentEventReader
+public interface IExperimentCountsReader
 {
-    IAsyncEnumerable<ExposureRow> ReadExposuresAsync(Guid environmentId, string experimentKey, CancellationToken ct);
-
-    IAsyncEnumerable<ConversionRow> ReadConversionsAsync(Guid environmentId, string metric, CancellationToken ct);
+    Task<ExperimentCounts> ReadAsync(Guid environmentId, string experimentKey, string metric, CancellationToken ct);
 }
 
 /// <param name="ExcludedUsers">Users exposed to more than one variation, left out of every figure.</param>
@@ -31,14 +31,11 @@ public sealed record ExperimentResults(
     long UnknownVariationUsers,
     DateTimeOffset GeneratedAt);
 
-/// <summary>
-/// Computes an experiment's results straight from raw events (ADR-0006). Reading raw events is the interim approach;
-/// ADR-0004 plans rollup tables so dashboard queries do not scan them.
-/// </summary>
+/// <summary>Computes an experiment's results from the rollups (ADR-0004, ADR-0006).</summary>
 public sealed class ResultsService(
     IProjectRepository projects,
     IExperimentRepository experiments,
-    IExperimentEventReader reader,
+    IExperimentCountsReader counts,
     AnalysisOptions options,
     TimeProvider clock)
 {
@@ -62,29 +59,25 @@ public sealed class ResultsService(
             throw new DomainException("Results need an experiment with at least two variations.");
         }
 
-        var aggregator = new ResultsAggregator(variations.Select(v => v.Key).ToList());
-        await foreach (ExposureRow row in reader.ReadExposuresAsync(environment.Id, experiment.Key, ct))
-        {
-            aggregator.AddExposure(row.UserId, row.VariationKey, row.At);
-        }
+        ExperimentCounts observed = await counts.ReadAsync(environment.Id, experiment.Key, validMetric, ct);
+        var byKey = observed.ByVariation.ToDictionary(c => c.VariationKey, StringComparer.Ordinal);
 
-        await foreach (ConversionRow row in reader.ReadConversionsAsync(environment.Id, validMetric, ct))
-        {
-            aggregator.AddConversion(row.UserId, row.At);
-        }
-
-        AggregatedCounts counts = aggregator.Complete();
         var data = variations
-            .Zip(counts.Counts, (v, c) => new VariationData(v.Key, v.TrafficBasisPoints, c.Exposed, c.Converted))
+            .Select(v => byKey.TryGetValue(v.Key, out VariationCount? c)
+                ? new VariationData(v.Key, v.TrafficBasisPoints, c.Exposed, c.Converted)
+                : new VariationData(v.Key, v.TrafficBasisPoints, 0, 0))
             .ToList();
+
+        var defined = variations.Select(v => v.Key).ToHashSet(StringComparer.Ordinal);
+        long unknown = observed.ByVariation.Where(c => !defined.Contains(c.VariationKey)).Sum(c => c.Exposed);
 
         return new ExperimentResults(
             experiment.Key,
             validMetric,
             experiment.Status.ToString(),
             ExperimentAnalyzer.Analyze(data, options),
-            counts.ExcludedUsers,
-            counts.UnknownVariationUsers,
+            observed.ExcludedUsers,
+            unknown,
             clock.GetUtcNow());
     }
 }

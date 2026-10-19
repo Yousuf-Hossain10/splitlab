@@ -29,7 +29,8 @@ flowchart LR
 | Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
 | Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
 | Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised. SDK-side event client still to do |
-| Statistics engine | Done, tested: Bayesian results and sample ratio check. Reads raw events for now; rollup tables still to do |
+| Statistics engine | Done, tested: Bayesian results and sample ratio check |
+| Rollup tables | Done, tested on SQLite: per-user state kept in step with events; the PostgreSQL upsert is not yet exercised |
 | Angular dashboard | Planned |
 | Observability, load tests | Planned |
 
@@ -79,7 +80,7 @@ The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/con
 
 ### Results ([ADR-0006](docs/adr/0006-bayesian-stats-with-srm-check.md))
 
-`GET /v1/projects/{p}/environments/{e}/experiments/{key}/results?metric=purchase` (any member) returns, per variation, the exposed and converted users, the observed rate, the posterior mean with a 95% credible interval, the probability to beat control and the expected loss. It also reports the sample ratio check and a recommendation: `Leader`, `Inconclusive`, `KeepCollecting`, or `Untrustworthy` when the traffic split does not match the configuration (in which case no winner is shown). Users seen in more than one variation are excluded and counted separately. Output is deterministic for a given dataset.
+`GET /v1/projects/{p}/environments/{e}/experiments/{key}/results?metric=purchase` (any member) returns, per variation, the exposed and converted users, the observed rate, the posterior mean with a 95% credible interval, the probability to beat control and the expected loss. It also reports the sample ratio check and a recommendation: `Leader`, `Inconclusive`, `KeepCollecting`, or `Untrustworthy` when the traffic split does not match the configuration (in which case no winner is shown). Users seen in more than one variation are excluded and counted separately. Output is deterministic for a given dataset. Results are read from per-user rollup tables that are updated in the same transaction as the events, so they are always current; `POST /v1/projects/{p}/environments/{e}/rollups/rebuild` (Admin) recomputes them from the raw events, which is needed once after upgrading a deployment that already holds events.
 
 ### Authentication ([ADR-0010](docs/adr/0010-authentication-and-tenant-isolation.md))
 

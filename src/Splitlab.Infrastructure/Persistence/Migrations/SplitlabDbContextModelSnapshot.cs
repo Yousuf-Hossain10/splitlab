@@ -303,6 +303,62 @@ namespace Splitlab.Infrastructure.Persistence.Migrations
                     b.ToTable("project_members", (string)null);
                 });
 
+            modelBuilder.Entity("Splitlab.Domain.Statistics.ExperimentUserState", b =>
+                {
+                    b.Property<Guid>("EnvironmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExperimentKey")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Conflicted")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("FirstExposureMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VariationKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("EnvironmentId", "ExperimentKey", "UserId");
+
+                    b.ToTable("experiment_user_states", (string)null);
+                });
+
+            modelBuilder.Entity("Splitlab.Domain.Statistics.MetricUserState", b =>
+                {
+                    b.Property<Guid>("EnvironmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Metric")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("UserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("LastConversionMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("EnvironmentId", "Metric", "UserId");
+
+                    b.ToTable("metric_user_states", (string)null);
+                });
+
             modelBuilder.Entity("Splitlab.Domain.Experiments.Experiment", b =>
                 {
                     b.HasOne("Splitlab.Domain.Projects.ProjectEnvironment", null)

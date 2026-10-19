@@ -1,15 +1,18 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
 using Splitlab.Application.Events;
 using Splitlab.Domain.Events;
+using Splitlab.Domain.Statistics;
 using Splitlab.Infrastructure.Persistence;
 
 namespace Splitlab.Infrastructure.Events;
 
 /// <summary>
 /// Writes event batches, skipping events that are already stored. This bypasses EF change tracking on purpose:
-/// the writer serves many projects at once and has no request tenant (ADR-0004).
+/// the writer serves many projects at once and has no request tenant (ADR-0004). The per-user rollups behind results are
+/// updated in the same transaction, so they can never disagree with the stored events.
 /// PostgreSQL uses COPY into a staging table then <c>INSERT ... ON CONFLICT DO NOTHING</c>; other providers
 /// (the SQLite used in tests) use one conflict-ignoring insert per event inside a transaction.
 /// </summary>
@@ -61,6 +64,8 @@ internal sealed class EventStore(SplitlabDbContext db) : IEventStore
                 inserted = await insert.ExecuteNonQueryAsync(ct);
             }
 
+            await RollupWriter.ApplyAsync(connection, tx, RollupBatch.From(batch), ct);
+
             await tx.CommitAsync(ct);
             return inserted;
         }
@@ -85,6 +90,8 @@ internal sealed class EventStore(SplitlabDbContext db) : IEventStore
                 """,
                 ct);
         }
+
+        await RollupWriter.ApplyAsync(db.Database.GetDbConnection(), tx.GetDbTransaction(), RollupBatch.From(batch), ct);
 
         await tx.CommitAsync(ct);
         return inserted;

@@ -77,6 +77,7 @@ public sealed class SecurityTests(ApiFactory factory) : IClassFixture<ApiFactory
             (HttpMethod.Put, $"{e}/experiments/checkout/variations", new { version = 1, variations = new[] { new { key = "a", trafficBasisPoints = 1 } } }),
             (HttpMethod.Post, $"{e}/experiments/checkout/start", new { version = 1 }),
             (HttpMethod.Post, $"{e}/experiments/checkout/stop", new { version = 1 }),
+            (HttpMethod.Post, $"{e}/rollups/rebuild", null),
             (HttpMethod.Get, $"{e}/api-keys", null),
             (HttpMethod.Post, $"{e}/api-keys", new { name = "k", permissions = new[] { "config:read" } }),
             (HttpMethod.Post, $"{e}/api-keys/{SomeId}/revoke", null),

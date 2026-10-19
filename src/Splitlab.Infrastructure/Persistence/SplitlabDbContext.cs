@@ -4,6 +4,7 @@ using Splitlab.Domain.Audit;
 using Splitlab.Domain.Events;
 using Splitlab.Domain.Experiments;
 using Splitlab.Domain.Projects;
+using Splitlab.Domain.Statistics;
 
 namespace Splitlab.Infrastructure.Persistence;
 
@@ -25,6 +26,10 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     public DbSet<EventRecord> Events => Set<EventRecord>();
+
+    public DbSet<ExperimentUserState> ExperimentUserStates => Set<ExperimentUserState>();
+
+    public DbSet<MetricUserState> MetricUserStates => Set<MetricUserState>();
 
     // Read by the global query filters on every query. With no tenant set this is Guid.Empty,
     // which matches no row, so forgetting to scope a request fails closed (ADR-0010).
@@ -119,6 +124,27 @@ public sealed class SplitlabDbContext(DbContextOptions<SplitlabDbContext> option
             b.HasIndex(e => new { e.EnvironmentId, e.ExperimentKey, e.Kind });
             b.HasIndex(e => e.ProjectId);
             b.HasQueryFilter(e => e.ProjectId == CurrentProjectId);
+        });
+
+        // Rollups behind results (ADR-0004): one small row per user per experiment, and per user per metric. Written with
+        // upserts by RollupWriter inside the transaction that stores the events; this mapping serves reads.
+        modelBuilder.Entity<ExperimentUserState>(b =>
+        {
+            b.ToTable("experiment_user_states");
+            b.HasKey(s => new { s.EnvironmentId, s.ExperimentKey, s.UserId });
+            b.Property(s => s.ExperimentKey).HasMaxLength(64);
+            b.Property(s => s.UserId).HasMaxLength(EventRecord.MaxUserIdLength);
+            b.Property(s => s.VariationKey).HasMaxLength(64);
+            b.HasQueryFilter(s => s.ProjectId == CurrentProjectId);
+        });
+
+        modelBuilder.Entity<MetricUserState>(b =>
+        {
+            b.ToTable("metric_user_states");
+            b.HasKey(s => new { s.EnvironmentId, s.Metric, s.UserId });
+            b.Property(s => s.Metric).HasMaxLength(64);
+            b.Property(s => s.UserId).HasMaxLength(EventRecord.MaxUserIdLength);
+            b.HasQueryFilter(s => s.ProjectId == CurrentProjectId);
         });
 
         modelBuilder.Entity<ApiKey>(b =>
