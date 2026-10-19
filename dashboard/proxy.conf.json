@@ -1,0 +1,5 @@
+{
+  "/v1": { "target": "http://localhost:5080", "secure": false },
+  "/dev": { "target": "http://localhost:5080", "secure": false },
+  "/swagger": { "target": "http://localhost:5080", "secure": false }
+}

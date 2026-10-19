@@ -41,6 +41,7 @@ builder.Services.AddRateLimiter(o =>
         context.User.FindFirst(SdkClaims.KeyPrefix)?.Value ?? "unknown",
         _ => new FixedWindowRateLimiterOptions { PermitLimit = eventsPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
 });
+builder.Services.AddSplitlabOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
@@ -54,6 +55,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
+app.UseSwagger();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();

@@ -33,3 +33,31 @@ jobs:
           name: coverage
           path: TestResults/**/coverage.cobertura.xml
           if-no-files-found: warn
+
+  dashboard:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      # The TypeScript client is generated from openapi/splitlab.v1.json (ADR-0008). The .NET job already fails if that
+      # file is out of date with the API; this fails if the committed client is out of date with the file.
+      - name: Check the generated API client is current
+        run: npm run check:api
+
+      - name: Test
+        run: npm run test:ci
+
+      - name: Build
+        run: npm run build

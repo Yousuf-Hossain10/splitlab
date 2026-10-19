@@ -1,0 +1,138 @@
+<app-breadcrumbs
+  [crumbs]="[
+    { label: 'Projects', link: ['/projects'] },
+    { label: project(), link: ['/projects', project()] },
+    { label: environment(), link: ['/projects', project(), 'environments', environment()] },
+    { label: key(), link: ['/projects', project(), 'environments', environment(), 'experiments', key()] },
+    { label: 'Results' },
+  ]"
+/>
+
+<div class="row spread">
+  <h1>Results: <span class="mono">{{ key() }}</span></h1>
+  <a class="btn" [routerLink]="['/projects', project(), 'environments', environment(), 'experiments', key()]">Experiment settings</a>
+</div>
+
+<form class="card metric row" (submit)="$event.preventDefault(); applyMetric()">
+  <div class="field grow">
+    <label for="metric">Conversion event to measure</label>
+    <input id="metric" name="metric" type="text" class="mono" placeholder="purchase" autocomplete="off" [ngModel]="metricDraft()" (ngModelChange)="metricDraft.set($event)" aria-describedby="metric-hint" />
+    <div id="metric-hint" class="hint">The <code>name</code> of the conversion events your app sends, for example <code>purchase</code> or <code>signup</code>.</div>
+  </div>
+  <button class="btn primary" type="submit" [disabled]="!metricValid()">Show results</button>
+</form>
+
+@if (!metric()) {
+  <div class="card empty">
+    <p><strong>Choose what to measure.</strong></p>
+    <p>Enter the name of a conversion event above to see how each variation performs.</p>
+  </div>
+} @else {
+  <div class="row spread toolbar">
+    <p class="muted status" role="status" aria-live="polite">
+      @if (state().loading && !results()) {
+        Loading results…
+      } @else if (state().updatedAt; as at) {
+        Updated {{ at.toLocaleTimeString() }}
+      }
+    </p>
+    <div class="row">
+      <label class="check" for="auto"><input id="auto" type="checkbox" [checked]="autoRefresh()" (change)="toggleAuto($any($event.target).checked)" /> Refresh every 15 seconds</label>
+      <button type="button" class="btn small" (click)="refreshNow()" [disabled]="state().loading">Refresh now</button>
+    </div>
+  </div>
+
+  <app-error [message]="state().error" />
+
+  @if (results(); as r) {
+    @if (recommendation(); as rec) {
+      <section class="banner verdict" [class]="'banner verdict ' + tone()" [attr.role]="rec.kind === 'Untrustworthy' ? 'alert' : 'status'" aria-labelledby="verdict-title">
+        <strong id="verdict-title">{{ headline() }}</strong>
+        <span>{{ rec.message }}</span>
+      </section>
+    }
+
+    <section class="quality card" aria-labelledby="quality-title">
+      <h2 id="quality-title">Data quality</h2>
+      <ul>
+        <li>
+          <span class="chip" [class.good]="sampleRatio().healthy" [class.bad]="!sampleRatio().healthy">{{ sampleRatio().healthy ? 'OK' : 'Problem' }}</span>
+          {{ sampleRatio().text }}
+        </li>
+        <li>
+          <span class="chip" [class.warn]="r.excludedUsers > 0">{{ formatCount(r.excludedUsers) }}</span>
+          users saw more than one variation and are excluded
+        </li>
+        @if (r.unknownVariationUsers > 0) {
+          <li>
+            <span class="chip warn">{{ formatCount(r.unknownVariationUsers) }}</span>
+            users were exposed to a variation this experiment does not define
+          </li>
+        }
+      </ul>
+    </section>
+
+    <section class="card" aria-labelledby="chart-title" [class.untrusted]="!trusted()">
+      <h2 id="chart-title">Conversion rate by variation</h2>
+      <p class="muted">Dot: most likely rate. Line: 95% credible interval, the range the true rate is 95% likely to fall in.</p>
+      @if (!trusted()) {
+        <p class="banner warn">Shown for debugging only. These numbers are not reliable until the data problem above is fixed.</p>
+      }
+      <app-interval-chart [variations]="variations()" />
+    </section>
+
+    <section class="card" aria-labelledby="table-title">
+      <h2 id="table-title">Details</h2>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Results for each variation of {{ key() }}, measuring {{ r.metric }}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Variation</th>
+              <th scope="col" class="num">Users</th>
+              <th scope="col" class="num">Converted</th>
+              <th scope="col" class="num">Rate</th>
+              <th scope="col" class="num">95% interval</th>
+              <th scope="col" class="num">Chance to beat control</th>
+              <th scope="col" class="num">Expected loss</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (v of variations(); track v.key) {
+              <tr [class.leader]="trusted() && recommendation()?.variation === v.key">
+                <th scope="row">
+                  <span class="mono">{{ v.key }}</span>
+                  @if (v.isControl && v.key !== 'control') { <span class="chip">control</span> }
+                  @if (trusted() && recommendation()?.variation === v.key) { <span class="chip good">leader</span> }
+                </th>
+                <td class="num">{{ formatCount(v.exposed) }}</td>
+                <td class="num">{{ formatCount(v.converted) }}</td>
+                <td class="num">{{ formatRate(v.posteriorMean) }}<div class="sub">observed {{ formatRate(v.observedRate) }}</div></td>
+                <td class="num">{{ formatRate(v.credibleLow) }} – {{ formatRate(v.credibleHigh) }}</td>
+                <td class="num">
+                  @if (v.isControl) {
+                    <span class="muted">baseline</span>
+                  } @else {
+                    {{ formatProbability(v.probabilityToBeatControl) }}
+                    <div class="sub">n = {{ formatCount(v.exposed) }} vs {{ formatCount(control()?.exposed ?? 0) }}</div>
+                  }
+                </td>
+                <td class="num">{{ formatLoss(v.expectedLoss) }}<div class="sub">if you choose this</div></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="muted small">
+        Expected loss is the conversion rate you would give up, on average, by choosing a variation that turns out not to be the best. Estimated from
+        {{ formatCount(analysis()?.monteCarloSamples ?? 0) }} simulations with a fixed seed, so the same data always gives the same numbers.
+      </p>
+    </section>
+
+    @if (notice(); as text) {
+      <p class="muted small notice">{{ text }}</p>
+    }
+  } @else if (state().loading) {
+    <app-loading label="Loading results…" />
+  }
+}

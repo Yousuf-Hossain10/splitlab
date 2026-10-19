@@ -31,7 +31,7 @@ flowchart LR
 | Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised. SDK-side event client still to do |
 | Statistics engine | Done, tested: Bayesian results and sample ratio check |
 | Rollup tables | Done, tested on SQLite: per-user state kept in step with events; the PostgreSQL upsert is not yet exercised |
-| Angular dashboard | Planned |
+| Angular dashboard | Done for projects, experiments, results and SDK keys, tested (unit and component); sign-in through an identity provider, flags and end-to-end tests still to do |
 | Observability, load tests | Planned |
 
 ## Repository layout
@@ -42,6 +42,7 @@ src/Splitlab.Domain/         Entities and business rules (no dependencies)
 src/Splitlab.Application/    Use cases and repository interfaces
 src/Splitlab.Infrastructure/ EF Core, PostgreSQL, migrations
 src/Splitlab.Api/            HTTP endpoints and composition root
+dashboard/                   Angular dashboard (generated API client; see dashboard/README.md)
 tests/                       SDK, domain and API integration tests
 docs/adr/                   Architecture decision records
 .github/workflows/          CI
@@ -64,6 +65,10 @@ dotnet run --project src/Splitlab.Api
 ```
 
 The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`.
+
+### The dashboard
+
+`dashboard/` is an Angular app for projects, experiments, results and SDK keys. Its TypeScript client is generated from the API's OpenAPI document, which is committed at `dashboard/openapi/splitlab.v1.json` and checked by a test, so API changes cannot silently break it. See [dashboard/README.md](dashboard/README.md).
 
 ### Sending events ([ADR-0005](docs/adr/0005-event-ingestion-with-bounded-channel.md))
 
