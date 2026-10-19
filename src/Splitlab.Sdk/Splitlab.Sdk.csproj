@@ -1,0 +1,9 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Splitlab.Sdk</RootNamespace>
+    <Description>Splitlab decision SDK: deterministic, local bucketing for feature flags and experiments.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

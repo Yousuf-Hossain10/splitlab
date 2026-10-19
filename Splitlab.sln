@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{CCA5BBFE-992B-4122-9FB0-CADB76CFD995}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Splitlab.Sdk", "src\Splitlab.Sdk\Splitlab.Sdk.csproj", "{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{DBA275B7-5AB1-447A-ABD7-BE22DC80C829}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Splitlab.Sdk.Tests", "tests\Splitlab.Sdk.Tests\Splitlab.Sdk.Tests.csproj", "{B7CE40DB-3C98-4297-862A-D81147F90DA3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7CE40DB-3C98-4297-862A-D81147F90DA3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7CE40DB-3C98-4297-862A-D81147F90DA3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7CE40DB-3C98-4297-862A-D81147F90DA3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7CE40DB-3C98-4297-862A-D81147F90DA3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{118BAB25-03DA-4A7A-BA2D-C4EA4FD6CEC4} = {CCA5BBFE-992B-4122-9FB0-CADB76CFD995}
+		{B7CE40DB-3C98-4297-862A-D81147F90DA3} = {DBA275B7-5AB1-447A-ABD7-BE22DC80C829}
+	EndGlobalSection
+EndGlobal
