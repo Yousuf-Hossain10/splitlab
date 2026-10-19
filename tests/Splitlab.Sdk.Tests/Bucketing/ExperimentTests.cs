@@ -31,33 +31,33 @@ public class ExperimentTests
     [InlineData("   ")]
     public void BlankExperimentKeyIsRejected(string key)
     {
-        Assert.Throws<ArgumentException>(() => new Experiment(key, [new Variation("a", 100)]));
+        Assert.Throws<ArgumentException>(() => _ = new Experiment(key, [new Variation("a", 100)]));
     }
 
     [Fact]
     public void NullExperimentKeyIsRejected()
     {
-        Assert.Throws<ArgumentNullException>(() => new Experiment(null!, [new Variation("a", 100)]));
+        Assert.Throws<ArgumentNullException>(() => _ = new Experiment(null!, [new Variation("a", 100)]));
     }
 
     [Fact]
     public void ExperimentWithoutVariationsIsRejected()
     {
-        Assert.Throws<ArgumentException>(() => new Experiment("exp", []));
+        Assert.Throws<ArgumentException>(() => _ = new Experiment("exp", []));
     }
 
     [Fact]
     public void DuplicateVariationKeysAreRejected()
     {
         Assert.Throws<ArgumentException>(() =>
-            new Experiment("exp", [new Variation("a", 100), new Variation("a", 200)]));
+            _ = new Experiment("exp", [new Variation("a", 100), new Variation("a", 200)]));
     }
 
     [Fact]
     public void AllocationAboveFullTrafficIsRejected()
     {
         Assert.Throws<ArgumentException>(() =>
-            new Experiment("exp", [new Variation("a", 6_000), new Variation("b", 4_001)]));
+            _ = new Experiment("exp", [new Variation("a", 6_000), new Variation("b", 4_001)]));
     }
 
     [Theory]
@@ -65,7 +65,7 @@ public class ExperimentTests
     [InlineData(10_001)]
     public void VariationTrafficOutsideBucketSpaceIsRejected(int basisPoints)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new Variation("a", basisPoints));
+        Assert.Throws<ArgumentOutOfRangeException>(() => _ = new Variation("a", basisPoints));
     }
 
     [Theory]
@@ -73,6 +73,6 @@ public class ExperimentTests
     [InlineData("  ")]
     public void BlankVariationKeyIsRejected(string key)
     {
-        Assert.Throws<ArgumentException>(() => new Variation(key, 100));
+        Assert.Throws<ArgumentException>(() => _ = new Variation(key, 100));
     }
 }
