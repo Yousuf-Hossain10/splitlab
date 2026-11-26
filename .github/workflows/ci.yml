@@ -100,3 +100,72 @@ jobs:
             dashboard/playwright-report
             dashboard/test-results
           if-no-files-found: ignore
+
+  # The same end-to-end tests, but against the real API on real PostgreSQL, so the PostgreSQL-only code (migrations, the COPY
+  # write path, rollup upserts, tenant-filtered queries, the rebuild) is exercised on every push.
+  e2e-postgres:
+    runs-on: ubuntu-latest
+    needs: [dotnet, dashboard]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: splitlab
+          POSTGRES_PASSWORD: splitlab-dev-only
+          POSTGRES_DB: splitlab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U splitlab -d splitlab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      # Development mode applies the EF migrations at startup and enables the /dev/token sign-in the dashboard uses.
+      # The connection string in appsettings.json already points at localhost:5432 with these credentials.
+      - name: Start the API on PostgreSQL
+        run: |
+          ASPNETCORE_ENVIRONMENT=Development nohup dotnet run --project src/Splitlab.Api --no-launch-profile --urls http://localhost:5080 > api.log 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fs http://localhost:5080/swagger/v1/swagger.json > /dev/null; then echo "API is up"; exit 0; fi
+            sleep 2
+          done
+          echo "API did not start"; cat api.log; exit 1
+
+      - name: Install
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Install the test browser
+        working-directory: dashboard
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests on PostgreSQL
+        working-directory: dashboard
+        env:
+          E2E_EXTERNAL_API: "1"
+        run: npm run e2e
+
+      - name: Keep the logs when something fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-e2e-logs
+          path: |
+            api.log
+            dashboard/playwright-report
+            dashboard/test-results
+          if-no-files-found: ignore
+

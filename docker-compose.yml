@@ -6,7 +6,8 @@ services:
       POSTGRES_PASSWORD: splitlab-dev-only
       POSTGRES_DB: splitlab
     ports:
-      - "5432:5432"
+      # Change the host port if something else already uses 5432: SPLITLAB_PG_PORT=5433 docker compose up -d
+      - "${SPLITLAB_PG_PORT:-5432}:5432"
     volumes:
       - splitlab-pg:/var/lib/postgresql/data
 

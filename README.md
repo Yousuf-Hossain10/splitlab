@@ -29,9 +29,9 @@ flowchart LR
 | Decision SDK: event tracker (exposures and conversions) | Done, tested against the real API |
 | Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
 | Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
-| Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised |
+| Event ingestion pipeline | Done, tested on SQLite and verified on PostgreSQL 16 |
 | Statistics engine | Done, tested: Bayesian results and sample ratio check |
-| Rollup tables | Done, tested on SQLite: per-user state kept in step with events; the PostgreSQL upsert is not yet exercised |
+| Rollup tables | Done: per-user state kept in step with events, tested on SQLite and verified on PostgreSQL 16 |
 | Angular dashboard | Done for projects, experiments, results and SDK keys, tested (unit and component); sign-in through an identity provider, flags and end-to-end tests still to do |
 | Observability, load tests | Planned |
 
@@ -63,6 +63,13 @@ To run the API locally (migrations apply automatically in Development):
 ```bash
 docker compose up -d
 dotnet run --project src/Splitlab.Api
+```
+
+If something else already uses port 5432, start the database on another port and tell the API where it is:
+
+```bash
+SPLITLAB_PG_PORT=5433 docker compose up -d
+ConnectionStrings__Splitlab="Host=localhost;Port=5433;Database=splitlab;Username=splitlab;Password=splitlab-dev-only"   dotnet run --project src/Splitlab.Api
 ```
 
 The management API lives under `/v1/projects/...` and the SDK polls `GET /v1/config/{environmentKey}`.

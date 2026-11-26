@@ -5,6 +5,9 @@ const apiUrl = 'http://localhost:5080';
 const appUrl = 'http://localhost:4200';
 // Absolute, because `dotnet run --project` starts the host in its own project directory, not this one.
 const databaseFile = path.resolve(__dirname, 'e2e', '.data', 'splitlab.db');
+// Set E2E_EXTERNAL_API=1 to test an API that is already running (CI uses this to test the real API on PostgreSQL).
+// Locally, an API already listening on the port is reused anyway.
+const reuseApi = !process.env['CI'] || !!process.env['E2E_EXTERNAL_API'];
 
 /**
  * End-to-end tests drive the real dashboard in a real browser against the real API: its endpoints, authentication,
@@ -37,7 +40,7 @@ export default defineConfig({
     {
       command: `dotnet run --project ../tests/Splitlab.E2E.Host -- --db "${databaseFile}" --urls ${apiUrl}`,
       url: apiUrl + '/swagger/v1/swagger.json',
-      reuseExistingServer: !process.env['CI'],
+      reuseExistingServer: reuseApi,
       timeout: 180_000,
     },
     {
