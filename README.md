@@ -26,9 +26,10 @@ flowchart LR
 | --- | --- |
 | Decision SDK: hashing and bucketing | Done, tested |
 | Decision SDK: datafile client, polling, decide API | Done, tested |
+| Decision SDK: event tracker (exposures and conversions) | Done, tested against the real API |
 | Management API, persistence | Done: projects, environments, experiments, audit log, datafile endpoint. Feature flags still to do |
 | Authentication, tenant isolation | Done, tested: JWT roles per project, hashed SDK keys, query filters. Rate limiting arrives with event ingestion |
-| Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised. SDK-side event client still to do |
+| Event ingestion pipeline | Done, tested on SQLite; the PostgreSQL `COPY` path is not yet exercised |
 | Statistics engine | Done, tested: Bayesian results and sample ratio check |
 | Rollup tables | Done, tested on SQLite: per-user state kept in step with events; the PostgreSQL upsert is not yet exercised |
 | Angular dashboard | Done for projects, experiments, results and SDK keys, tested (unit and component); sign-in through an identity provider, flags and end-to-end tests still to do |
@@ -122,5 +123,20 @@ client.Start();
 Decision d = client.Decide("checkout_flow", "user-42", defaultVariation: "control");
 // d.VariationKey, d.Reason (Assigned, NotInExperiment, ExperimentNotFound, ConfigNotLoaded)
 ```
+
+Reporting what users saw and did is a separate, non-blocking component. Tracking only queues the event in memory; a background loop sends batches, retries failures with exponential backoff and jitter, honours `429 Retry-After`, and resends a failed batch unchanged so the server stores each event once ([ADR-0005](docs/adr/0005-event-ingestion-with-bounded-channel.md)):
+
+```csharp
+using var http = new HttpClient();
+var baseUri = new Uri("https://splitlab.example/");
+await using var tracker = new EventTracker(new HttpEventTransport(http, baseUri, "sl_..."),
+    new EventTrackerOptions { OnProblem = p => logger.LogWarning("{Kind}: {Message}", p.Kind, p.Message) });
+
+Decision d = client.Decide("checkout_flow", "user-42", defaultVariation: "control");
+tracker.TrackExposure(d, "user-42");              // only counts if the user was really assigned a variation
+tracker.TrackConversion("purchase", "user-42", 19.99);
+```
+
+If the server is slow or unreachable the queue is bounded (10,000 events by default) and the newest events are dropped and counted in `tracker.Stats`, never memory. Events still queued when a process crashes are lost, which is acceptable for analytics counts; disposing the tracker (or `FlushAsync()`) sends what is waiting.
 
 `Assign` returns `null` when a user falls outside the experiment's allocated traffic. The hash input, bucket space and range layout are specified in [ADR-0003](docs/adr/0003-deterministic-hash-bucketing.md), and golden test vectors in `BucketerTests` let other language SDKs verify they agree.
