@@ -1,4 +1,6 @@
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { FormsModule } from '@angular/forms';
 import { buttonByText, el, settle, text } from '../../testing';
 import { VariationsEditor } from './variations-editor';
 import type { VariationRow } from './variations';
@@ -100,5 +102,30 @@ describe('VariationsEditor', () => {
 
     expect(el(fixture).querySelector('label[for="vkey-0"]')?.textContent).toContain('Variation 1 key');
     expect(el(fixture).querySelector('label[for="vpct-0"]')?.textContent).toContain('traffic percent');
+  });
+
+  it('works inside a page that wraps it in a form, without Angular warning about unregistered controls', async () => {
+    // The create-experiment page puts the editor inside its <form>. Its inputs belong to the editor, not to that form, so
+    // they must say so explicitly; otherwise Angular logs NG01354 for every input on every render.
+    @Component({
+      imports: [FormsModule, VariationsEditor],
+      template: `<form><app-variations-editor [(rows)]="rows" /></form>`,
+    })
+    class FormHost {
+      readonly rows = signal<VariationRow[]>([
+        { key: 'control', percent: 50 },
+        { key: 'treatment', percent: 50 },
+      ]);
+    }
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fixture = TestBed.createComponent(FormHost);
+
+    await settle(fixture);
+
+    const angularWarnings = warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('NG01354'));
+    warn.mockRestore();
+    expect(angularWarnings).toEqual([]);
+    expect(el(fixture).querySelectorAll('tbody tr')).toHaveLength(2);
   });
 });

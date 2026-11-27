@@ -6,6 +6,9 @@ import { VariationRow, allocatedPercent, evenSplit, formatPercentValue } from '.
 /**
  * Edits an experiment's variations: a key and a traffic share each. The first variation is the control that
  * results are compared against. Anything not allocated stays out of the experiment (users see the default).
+ *
+ * The inputs are standalone controls: the editor is used inside a page's <form>, but its rows belong to the editor and are
+ * reported through the `rows` model, not through that form.
  */
 @Component({
   selector: 'app-variations-editor',
@@ -30,11 +33,11 @@ import { VariationRow, allocatedPercent, evenSplit, formatPercentValue } from '.
               <tr>
                 <td>
                   <label class="visually-hidden" [for]="'vkey-' + i">Variation {{ i + 1 }} key</label>
-                  <input [id]="'vkey-' + i" type="text" class="mono" [ngModel]="row.key" (ngModelChange)="update(i, { key: $event })" [name]="'vkey-' + i" />
+                  <input [id]="'vkey-' + i" type="text" class="mono" [ngModel]="row.key" (ngModelChange)="update(i, { key: $event })" [ngModelOptions]="{ standalone: true }" />
                 </td>
                 <td class="num">
                   <label class="visually-hidden" [for]="'vpct-' + i">Variation {{ i + 1 }} traffic percent</label>
-                  <input [id]="'vpct-' + i" type="number" min="0" max="100" step="0.01" [ngModel]="row.percent" (ngModelChange)="update(i, { percent: $event })" [name]="'vpct-' + i" />
+                  <input [id]="'vpct-' + i" type="number" min="0" max="100" step="0.01" [ngModel]="row.percent" (ngModelChange)="update(i, { percent: $event })" [ngModelOptions]="{ standalone: true }" />
                 </td>
                 <td>
                   <button type="button" class="btn small" (click)="remove(i)" [disabled]="rows().length <= 1" [attr.aria-label]="'Remove variation ' + (i + 1)">Remove</button>
