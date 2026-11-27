@@ -94,7 +94,7 @@ jobs:
           # in (the raw logs are not), so a failure can be diagnosed from the run summary or the public API.
           set -o pipefail
           if ! npm run e2e 2>&1 | tee e2e-output.log; then
-            summary=$(grep -v 'console.warn' e2e-output.log | tail -n 40 | head -c 3000 | sed 's/%/%25/g' | awk '{printf "End-to-end tests%%0A", $0}')
+            summary=$(grep -v 'console.warn' e2e-output.log | tail -n 40 | head -c 3000 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=End-to-end tests failed::${summary}"
             exit 1
           fi
@@ -170,7 +170,7 @@ jobs:
           # in (the raw logs are not), so a failure can be diagnosed from the run summary or the public API.
           set -o pipefail
           if ! npm run e2e 2>&1 | tee e2e-output.log; then
-            summary=$(grep -v 'console.warn' e2e-output.log | tail -n 40 | head -c 3000 | sed 's/%/%25/g' | awk '{printf "End-to-end tests on PostgreSQL%%0A", $0}')
+            summary=$(grep -v 'console.warn' e2e-output.log | tail -n 40 | head -c 3000 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
             echo "::error title=End-to-end tests on PostgreSQL failed::${summary}"
             exit 1
           fi
