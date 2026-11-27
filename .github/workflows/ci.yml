@@ -81,6 +81,12 @@ jobs:
           cache: npm
           cache-dependency-path: dashboard/package-lock.json
 
+      # Build the API host in its own step. Playwright starts it with `dotnet run`, which hides build errors inside the test
+      # run; here a failed build is a failed step with its compiler errors shown.
+      - name: Build the end-to-end API host
+        working-directory: .
+        run: dotnet build tests/Splitlab.E2E.Host
+
       - name: Install
         run: npm ci
 
