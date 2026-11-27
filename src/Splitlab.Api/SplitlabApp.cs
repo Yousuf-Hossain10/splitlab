@@ -57,11 +57,13 @@ public static class SplitlabApp
         });
         builder.Services.AddSplitlabOpenApi();
         builder.Services.AddProblemDetails();
-        builder.Services.AddExceptionHandler<ApiExceptionHandler>();
 
         WebApplication app = builder.Build();
 
+        // Order matters: the framework handler is outermost and logs anything that escapes as an error; the middleware inside
+        // it answers the application's expected refusals, so only genuine faults ever reach the handler.
         app.UseExceptionHandler();
+        app.UseMiddleware<ApiErrorMiddleware>();
         app.UseSwagger();
         app.UseAuthentication();
         app.UseAuthorization();

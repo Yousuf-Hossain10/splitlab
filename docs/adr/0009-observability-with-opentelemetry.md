@@ -36,3 +36,9 @@ Chosen: **option 3**.
 
 - Positive: vendor-neutral, reproducible locally, and the dashboard is code-reviewed along with the service.
 - Negative: more moving parts in the local setup; mitigated by making the observability stack an optional Compose profile.
+
+## Implementation notes
+
+- Error logs are reserved for genuine faults. The application's expected refusals (not found, conflict, invalid input) are answered as problem responses by `ApiErrorMiddleware` and logged at information level without a stack trace. The framework's exception handler logs every exception that reaches it as an unhandled error, so these are deliberately answered *inside* it: anything that does reach it is a bug and is logged as an error with its exception. Otherwise a routine `409` would look like a crash and real faults would be lost among them, which would make alerting on error logs useless. A test pins both halves.
+- The pipeline metrics named above are defined as .NET metrics but are not exported yet, and the health checks and the observability compose profile are still to do.
+

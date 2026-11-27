@@ -7,14 +7,46 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Splitlab.Api.Auth;
 using Splitlab.Infrastructure.Persistence;
 
 namespace Splitlab.Api.Tests;
 
+/// <summary>Collects everything the application logs, so tests can check what was (and was not) reported as an error.</summary>
+public sealed class LogSink : ILoggerProvider
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<LogEntry> _entries = new();
+
+    public sealed record LogEntry(LogLevel Level, string Category, string Message, Exception? Exception);
+
+    public IReadOnlyList<LogEntry> Entries => _entries.ToArray();
+
+    public void Clear() => _entries.Clear();
+
+    public ILogger CreateLogger(string categoryName) => new SinkLogger(categoryName, _entries);
+
+    public void Dispose()
+    {
+    }
+
+    private sealed class SinkLogger(string category, System.Collections.Concurrent.ConcurrentQueue<LogEntry> entries) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            entries.Enqueue(new LogEntry(logLevel, category, formatter(state, exception), exception));
+    }
+}
+
 /// <summary>Hosts the real API over an in-memory SQLite database that lives as long as the factory.</summary>
 public sealed class ApiFactory : WebApplicationFactory<Program>
 {
+    public LogSink Logs { get; } = new();
+
     public const string SigningKey = "test-signing-key-test-signing-key-0123456789";
 
     private readonly SqliteConnection _connection = new("DataSource=:memory:");
@@ -29,6 +61,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Testing");
         builder.UseSetting("Auth:Local:SigningKey", SigningKey);
         builder.UseSetting("EventPipeline:FlushInterval", "00:00:00.050");
+        builder.ConfigureLogging(logging => logging.AddProvider(Logs));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<SplitlabDbContext>>();
